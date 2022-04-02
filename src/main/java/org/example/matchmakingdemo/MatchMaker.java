@@ -1,5 +1,7 @@
 package org.example.matchmakingdemo;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalTime;
@@ -43,7 +45,7 @@ public enum MatchMaker {
             log.info("Not enough players in matchmaking, skip");
             return;
         }
-        Map<Integer, Set<PlayerInfo>> rankedMap = new HashMap<>();
+        Map<Integer, SortedSet<PlayerInfo>> rankedMap = new HashMap<>();
         for (PlayerInfo playerInfo : playerPool.values()) {
             rankedMap.putIfAbsent(playerInfo.getRank(), new TreeSet<>(new Comparator<PlayerInfo>() {
                 @Override
@@ -56,28 +58,14 @@ public enum MatchMaker {
         }
 
         Set<Long> matchedIds = new HashSet<>();
-        for (Set<PlayerInfo> playerInfos : rankedMap.values()) {
+        for (SortedSet<PlayerInfo> playerInfos : rankedMap.values()) {
             if (playerInfos.isEmpty()) {
                 continue;
             }
-            PlayerInfo longestWaiting = (PlayerInfo) ((TreeSet) playerInfos).first();
-            int waitingTimeInSecond = LocalTime.now().getSecond() - longestWaiting.getStartMatchingTime().getSecond();
+            PlayerInfo longestWaiting = playerInfos.first();
+            RankWrapper wrapper = calculateRank(longestWaiting);
 
-            float c2 = 1.5f;
-            int c3 = 5;
-            int c4 = 100;
-
-            float u = (float) Math.pow(waitingTimeInSecond, c2);
-            u = u + c3;
-            u = (float) Math.round(u);
-            u = Math.min(u, c4);
-
-            int min = (longestWaiting.getRank() - (int) u) < 0 ? 0 : (longestWaiting.getRank() - (int) u);
-            int max = longestWaiting.getRank() + (int) u;
-
-            int middle = longestWaiting.getRank();
-
-            for (int searchRankUp = middle + 1, searchRankDown = middle; searchRankUp <= max || searchRankDown >= min; searchRankUp++, searchRankDown--) {
+            for (int searchRankUp = wrapper.getMiddle() + 1, searchRankDown = wrapper.getMiddle(); searchRankUp <= wrapper.getMax() || searchRankDown >= wrapper.getMin(); searchRankUp++, searchRankDown--) {
                 if (NUM_MATCHING_PLAYERS.equals(matchedIds.size())) {
                     log.info("Found enough players for matchmaking");
                     break;
@@ -109,6 +97,34 @@ public enum MatchMaker {
             }
         }
 
+    }
+
+    private RankWrapper calculateRank (PlayerInfo longestWaiting) {
+        int waitingTimeInSecond = LocalTime.now().getSecond() - longestWaiting.getStartMatchingTime().getSecond();
+
+        float c2 = 1.5f;
+        int c3 = 5;
+        int c4 = 100;
+
+        float u = (float) Math.pow(waitingTimeInSecond, c2);
+        u = u + c3;
+        u = (float) Math.round(u);
+        u = Math.min(u, c4);
+
+        int min = (longestWaiting.getRank() - (int) u) < 0 ? 0 : (longestWaiting.getRank() - (int) u);
+        int max = longestWaiting.getRank() + (int) u;
+
+        int middle = longestWaiting.getRank();
+
+        return new RankWrapper(min, max, middle);
+    }
+
+    @Data
+    @AllArgsConstructor
+    private class RankWrapper {
+        private int min;
+        private int max;
+        private int middle;
     }
 
 
