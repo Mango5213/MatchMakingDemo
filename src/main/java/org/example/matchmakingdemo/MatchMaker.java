@@ -47,12 +47,8 @@ public enum MatchMaker {
         }
         Map<Integer, SortedSet<PlayerInfo>> rankedMap = new HashMap<>();
         for (PlayerInfo playerInfo : playerPool.values()) {
-            rankedMap.putIfAbsent(playerInfo.getRank(), new TreeSet<>(new Comparator<PlayerInfo>() {
-                @Override
-                public int compare(PlayerInfo o1, PlayerInfo o2) {
-                    return o1.getStartMatchingTime().compareTo(o2.getStartMatchingTime()) == 0 ? Long.compare(o1.getPlayerId(), o2.getPlayerId()) : o1.getStartMatchingTime().compareTo(o2.getStartMatchingTime());
-                }
-            }));
+            rankedMap.putIfAbsent(playerInfo.getRank(), new TreeSet<>((o1, o2)->
+                    o1.getStartMatchingTime().compareTo(o2.getStartMatchingTime()) == 0 ? Long.compare(o1.getPlayerId(), o2.getPlayerId()) : o1.getStartMatchingTime().compareTo(o2.getStartMatchingTime())));
             Set<PlayerInfo> set = rankedMap.get(playerInfo.getRank());
             set.add(playerInfo);
         }
@@ -72,31 +68,30 @@ public enum MatchMaker {
                 }
                 TreeSet<PlayerInfo> downSet = (TreeSet<PlayerInfo>) rankedMap.get(searchRankDown);
                 TreeSet<PlayerInfo> upSet = (TreeSet<PlayerInfo>) rankedMap.get(searchRankUp);
-                if (downSet != null) {
-                    for (int i = matchedIds.size(); i < NUM_MATCHING_PLAYERS; i++) {
-                        if (!downSet.isEmpty()) {
-                            matchedIds.add(downSet.pollFirst().getPlayerId());
-                        }
-                    }
-                }
-                if (upSet != null) {
-                    for (int i = matchedIds.size(); i < NUM_MATCHING_PLAYERS; i++) {
-                        if (!upSet.isEmpty()) {
-                            matchedIds.add(upSet.pollFirst().getPlayerId());
-                        }
-                    }
-                }
+                findMatchingIds(matchedIds, downSet);
+                findMatchingIds(matchedIds, upSet);
                 if (NUM_MATCHING_PLAYERS.equals(matchedIds.size())) {
                     log.info("Match Made!");
                     // doSomething()
                     for (Long playerId : matchedIds) {
                         playerPool.remove(playerId);
                     }
+
                     matchedIds.clear();
                 }
             }
         }
 
+    }
+
+    private void findMatchingIds(Set<Long> matchedIds, TreeSet<PlayerInfo> playerInfos) {
+        if (playerInfos != null) {
+            for (int i = matchedIds.size(); i < NUM_MATCHING_PLAYERS; i++) {
+                if (!playerInfos.isEmpty()) {
+                    matchedIds.add(playerInfos.pollFirst().getPlayerId());
+                }
+            }
+        }
     }
 
     private RankWrapper calculateRank (PlayerInfo longestWaiting) {
